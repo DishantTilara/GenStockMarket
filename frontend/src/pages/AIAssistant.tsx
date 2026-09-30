@@ -153,7 +153,7 @@ export const AIAssistant: React.FC = () => {
                   color: '#fff',
                   fontSize: '0.9rem',
                   lineHeight: 1.6,
-                  boxShadow: var(--shadow-sm),
+                  boxShadow: 'var(--shadow-sm)',
                   whiteSpace: 'pre-wrap'
                 }}>
                   {m.content}
