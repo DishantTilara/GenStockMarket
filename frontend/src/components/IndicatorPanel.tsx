@@ -7,13 +7,13 @@ interface IndicatorPanelProps {
 }
 
 export const IndicatorPanel: React.FC<IndicatorPanelProps> = ({ indicators }) => {
-  if (!indicators) return null;
+  if (!indicators || typeof indicators !== 'object' || 'error' in indicators) return null;
 
-  const rsi = indicators.rsi_14 || 50;
-  const trend = indicators.trend || 'NEUTRAL';
-  const vwap = indicators.vwap || 0;
-  const support = indicators.support || 0;
-  const resistance = indicators.resistance || 0;
+  const rsi = typeof indicators.rsi_14 === 'number' ? indicators.rsi_14 : 50;
+  const trend = typeof indicators.trend === 'string' ? indicators.trend : 'NEUTRAL';
+  const vwap = typeof indicators.vwap === 'number' ? indicators.vwap : 0;
+  const support = typeof indicators.support === 'number' ? indicators.support : 0;
+  const resistance = typeof indicators.resistance === 'number' ? indicators.resistance : 0;
 
   const getTrendBadge = (t: string) => {
     if (t.includes('BULLISH')) return <span className="badge badge-green">{t}</span>;

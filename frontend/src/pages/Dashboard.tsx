@@ -53,10 +53,10 @@ export const Dashboard: React.FC = () => {
         ApiClient.getPositions().catch(() => null),
         ApiClient.getOrders().catch(() => [])
       ]);
-      if (p) setPortfolio(p);
-      if (w) setWallet(w);
-      if (pos) setPositions(Array.isArray(pos) ? pos : (pos.open_positions || []));
-      if (ords) setRecentOrders(ords);
+      if (p && typeof p === 'object' && !('error' in p)) setPortfolio(p);
+      if (w && typeof w === 'object' && !('error' in w)) setWallet(w);
+      if (pos) setPositions(Array.isArray(pos) ? pos : Array.isArray((pos as any)?.open_positions) ? (pos as any).open_positions : []);
+      if (ords) setRecentOrders(Array.isArray(ords) ? ords : Array.isArray((ords as any)?.orders) ? (ords as any).orders : []);
     } catch {
       // quiet fallback
     }
@@ -72,8 +72,12 @@ export const Dashboard: React.FC = () => {
       ApiClient.getCandles(selectedSymbol, '1m', 60).catch(() => ApiClient.getMinuteBars(selectedSymbol, 60)).catch(() => []),
       ApiClient.getIndicators(selectedSymbol).catch(() => null)
     ]).then(([bars, ind]) => {
-      setCandles(bars);
-      setIndicators(ind);
+      setCandles(Array.isArray(bars) ? bars : []);
+      setIndicators(ind && typeof ind === 'object' && !('error' in ind) ? ind : null);
+      setLoading(false);
+    }).catch(() => {
+      setCandles([]);
+      setIndicators(null);
       setLoading(false);
     });
   }, [selectedSymbol]);
