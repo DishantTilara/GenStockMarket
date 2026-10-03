@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Settings as SettingsIcon, Shield, Server, Cpu, Database, CheckCircle2 } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { Settings as SettingsIcon, Shield, Server, Cpu, Database, CheckCircle2, Sun, Moon, Palette } from 'lucide-react';
 
 export const Settings: React.FC = () => {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [health, setHealth] = useState<any>(null);
 
   useEffect(() => {
@@ -18,8 +20,103 @@ export const Settings: React.FC = () => {
       <div>
         <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Platform Settings & System Health</h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          Environment configuration, provider connectivity, and risk engine thresholds
+          Environment configuration, appearance preferences, provider connectivity, and risk engine thresholds
         </p>
+      </div>
+
+      {/* Appearance & Theme Setting */}
+      <div className="card">
+        <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Palette size={18} color="var(--primary)" />
+          Appearance & Background Theme
+        </h4>
+        <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+          Choose your preferred interface theme. Selected theme is automatically applied and saved to your device.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
+          {/* White / Light Mode */}
+          <div
+            onClick={() => setTheme('light')}
+            style={{
+              padding: '16px',
+              borderRadius: '10px',
+              border: `2px solid ${theme === 'light' ? 'var(--primary)' : 'var(--border)'}`,
+              background: theme === 'light' ? 'var(--surface-muted)' : 'transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                <Sun size={20} color="#d97706" />
+                <span>White Background</span>
+              </div>
+              {theme === 'light' && <span className="badge badge-blue">ACTIVE</span>}
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Crisp light mode with high-contrast readable dark typography and soft clean surfaces.
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '6px',
+              marginTop: '4px',
+              padding: '6px',
+              background: '#f8fafc',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px'
+            }}>
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#ffffff', border: '1px solid #e2e8f0' }} />
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#2563eb' }} />
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#16a34a' }} />
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#dc2626' }} />
+            </div>
+          </div>
+
+          {/* Black / Dark Mode */}
+          <div
+            onClick={() => setTheme('dark')}
+            style={{
+              padding: '16px',
+              borderRadius: '10px',
+              border: `2px solid ${theme === 'dark' ? 'var(--primary)' : 'var(--border)'}`,
+              background: theme === 'dark' ? 'var(--surface-muted)' : 'transparent',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
+                <Moon size={20} color="#38bdf8" />
+                <span>Black Background</span>
+              </div>
+              {theme === 'dark' && <span className="badge badge-blue">ACTIVE</span>}
+            </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Deep midnight black background optimized for prolonged trading sessions and OLED contrast.
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '6px',
+              marginTop: '4px',
+              padding: '6px',
+              background: '#09090b',
+              border: '1px solid #27272a',
+              borderRadius: '6px'
+            }}>
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#12141a', border: '1px solid #232733' }} />
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#3b82f6' }} />
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#10b981' }} />
+              <div style={{ width: '16px', height: '16px', borderRadius: '4px', background: '#ef4444' }} />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* User Profile */}
@@ -54,21 +151,21 @@ export const Settings: React.FC = () => {
 
         {health ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }} className="mono">
-            <div style={{ background: 'rgba(30, 41, 59, 0.4)', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: '12px', borderRadius: '8px' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Provider Status</div>
               <div style={{ color: 'var(--accent-green)', fontWeight: 700, textTransform: 'uppercase' }}>
                 {health.provider}
               </div>
             </div>
-            <div style={{ background: 'rgba(30, 41, 59, 0.4)', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: '12px', borderRadius: '8px' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Ingestion Lag</div>
-              <div style={{ color: '#fff', fontWeight: 700 }}>{health.ingestion_lag_seconds}s</div>
+              <div style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{health.ingestion_lag_seconds}s</div>
             </div>
-            <div style={{ background: 'rgba(30, 41, 59, 0.4)', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: '12px', borderRadius: '8px' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Symbols Tracked</div>
-              <div style={{ color: '#fff', fontWeight: 700 }}>{health.symbols_received} / {health.symbols_expected}</div>
+              <div style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{health.symbols_received} / {health.symbols_expected}</div>
             </div>
-            <div style={{ background: 'rgba(30, 41, 59, 0.4)', padding: '12px', borderRadius: '8px' }}>
+            <div style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', padding: '12px', borderRadius: '8px' }}>
               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Missing Minutes</div>
               <div style={{ color: health.missing_minutes === 0 ? 'var(--accent-green)' : 'var(--accent-red)', fontWeight: 700 }}>
                 {health.missing_minutes} (Repaired)
@@ -88,19 +185,19 @@ export const Settings: React.FC = () => {
         </h4>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '0.85rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(30, 41, 59, 0.4)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: '8px' }}>
             <span>Maximum Single Order Value</span>
             <span className="mono font-bold">₹5,00,000.00</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(30, 41, 59, 0.4)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: '8px' }}>
             <span>Maximum Portfolio Concentration (Single Stock)</span>
             <span className="mono font-bold">25.0%</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(30, 41, 59, 0.4)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: '8px' }}>
             <span>Maximum Daily Loss Cutoff</span>
             <span className="mono font-bold">5.0%</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(30, 41, 59, 0.4)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--surface-muted)', border: '1px solid var(--border)', borderRadius: '8px' }}>
             <span>Mandatory Stop Loss Enforcement</span>
             <span className="badge badge-green">STRICT ENFORCEMENT</span>
           </div>

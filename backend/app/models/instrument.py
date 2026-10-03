@@ -18,6 +18,7 @@ class Instrument(Base):
     lot_size = Column(Integer, default=1, nullable=False)
     tick_size = Column(Numeric(10, 4), default=0.05, nullable=False)
     sector = Column(String(100), nullable=True, index=True)
+    provider_symbol = Column(String(50), nullable=True, index=True)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)

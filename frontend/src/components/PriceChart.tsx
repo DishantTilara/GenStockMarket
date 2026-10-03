@@ -12,17 +12,22 @@ interface Candle {
 
 interface PriceChartProps {
   symbol: string;
-  candles: Candle[];
+  candles?: Candle[];
+  initialCandles?: Candle[];
+  currentPrice?: number;
   timeframe?: string;
   onTimeframeChange?: (tf: string) => void;
 }
 
 export const PriceChart: React.FC<PriceChartProps> = ({
   symbol,
-  candles,
+  candles: propCandles,
+  initialCandles,
+  currentPrice,
   timeframe = '1m',
   onTimeframeChange
 }) => {
+  const candles = propCandles || initialCandles || [];
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 

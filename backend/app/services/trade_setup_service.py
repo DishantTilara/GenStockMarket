@@ -114,36 +114,9 @@ class TradeSetupService:
         if payload.get("type") != "trade_confirmation" or payload.get("sub") != str(user_id):
             raise AppError(code="INVALID_TRADE_CONFIRMATION", message="Invalid or expired trade confirmation token")
 
-        # Check funds in wallet
-        wallet = await WalletService.get_or_create_wallet(db, user_id)
-        order_cost = req.price * req.quantity
-        if Decimal(str(wallet.available_balance)) < order_cost:
-            raise AppError(code="INSUFFICIENT_FUNDS", message="Available balance insufficient at time of execution")
-
-        # Deduct cost from wallet and record ledger entry
-        wallet.available_balance = Decimal(str(wallet.available_balance)) - order_cost
-        ledger = LedgerEntry(
-            wallet_id=wallet.id,
-            reference=f"ORD-{uuid.uuid4().hex[:8].upper()}",
-            entry_type=f"TRADE_{req.side}",
-            direction="DEBIT",
-            amount=order_cost,
-            balance_after=wallet.available_balance,
-            status="POSTED",
-            description=f"Executed {req.side} order for {req.quantity} {req.symbol} @ ₹{req.price:,.2f}"
-        )
-        db.add(ledger)
-
-        # Submit to Broker Provider Adapter
-        broker = get_broker_provider()
-        broker_res = await broker.place_order({
-            "symbol": req.symbol,
-            "side": req.side,
-            "quantity": req.quantity,
-            "price": float(req.price)
-        })
-
-        order = Order(
+        from app.services.paper_trading_service import PaperTradingService
+        order = await PaperTradingService.create_paper_order(
+            db=db,
             user_id=user_id,
             symbol=req.symbol,
             side=req.side,
@@ -151,24 +124,9 @@ class TradeSetupService:
             quantity=req.quantity,
             price=req.price,
             stop_loss=req.stop_loss,
-            target=req.target,
-            status="FILLED",
-            broker_order_id=broker_res.get("order_id"),
-            risk_approved=True,
+            target_price=req.target,
             user_confirmed=True
         )
-        db.add(order)
-        await db.flush()
-
-        event = OrderEvent(
-            order_id=order.id,
-            event_type="FILLED",
-            details=broker_res
-        )
-        db.add(event)
-
-        await db.commit()
-        await db.refresh(order)
 
         return OrderResponse(
             id=order.id,
@@ -177,7 +135,14 @@ class TradeSetupService:
             order_type=order.order_type,
             quantity=order.quantity,
             price=order.price,
+            execution_price=order.execution_price,
+            stop_loss=order.stop_loss,
+            target=order.target,
             status=order.status,
+            charges=order.charges,
+            realized_pnl=order.realized_pnl,
+            error_message=order.error_message,
             broker_order_id=order.broker_order_id,
             created_at=order.created_at
         )
+

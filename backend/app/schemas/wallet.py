@@ -17,7 +17,7 @@ class WalletResponse(BaseModel):
 
 
 class DepositRequestCreate(BaseModel):
-    amount: Decimal = Field(..., gt=0, decimal_places=2)
+    amount: Decimal = Field(..., gt=Decimal("0"), decimal_places=2)
     idempotency_key: str = Field(..., min_length=8)
     payment_method: str = "simulated_upi"
 
@@ -32,7 +32,7 @@ class DepositResponse(BaseModel):
 
 
 class WithdrawalRequestCreate(BaseModel):
-    amount: Decimal = Field(..., gt=0, decimal_places=2)
+    amount: Decimal = Field(..., gt=Decimal("0"), decimal_places=2)
     bank_account_info: str = Field(..., min_length=4)
 
 

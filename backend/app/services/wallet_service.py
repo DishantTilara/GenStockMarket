@@ -16,11 +16,26 @@ class WalletService:
         if not wallet:
             wallet = Wallet(
                 user_id=user_id,
-                available_balance=Decimal("0.00"),
+                available_balance=Decimal("1000000.00"),
                 locked_balance=Decimal("0.00"),
                 currency="INR"
             )
             db.add(wallet)
+            await db.flush()
+
+            # Record initial deposit in ledger
+            ledger = LedgerEntry(
+                wallet_id=wallet.id,
+                reference=f"INIT-PAPER-{uuid.uuid4().hex[:8].upper()}",
+                entry_type="DEPOSIT",
+                direction="CREDIT",
+                amount=Decimal("1000000.00"),
+                balance_after=Decimal("1000000.00"),
+                status="POSTED",
+                description="Initial simulated paper trading capital",
+                metadata_json={"type": "INITIAL_PAPER_CAPITAL"}
+            )
+            db.add(ledger)
             await db.commit()
             await db.refresh(wallet)
         return wallet

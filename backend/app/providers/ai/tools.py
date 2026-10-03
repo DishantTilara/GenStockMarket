@@ -3,7 +3,8 @@ import json
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.providers.market_data.factory import get_market_data_provider
-from app.services.indicator_service import IndicatorService
+from app.services.fundamentals_service import FundamentalsService
+from app.services.options_service import OptionsService
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,20 @@ AI_TOOLS_SPEC = [
     {
         "type": "function",
         "function": {
+            "name": "get_option_chain",
+            "description": "Fetch verified Indian options metrics (Put-Call Ratio PCR, Max Pain strike, ATM implied volatility).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "symbol": {"type": "string", "description": "Stock symbol or index"}
+                },
+                "required": ["symbol"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "get_latest_news",
             "description": "Fetch verified news articles and corporate filings for symbol or general Indian market.",
             "parameters": {
@@ -99,19 +114,26 @@ class AIToolExecutor:
         if tool_name == "get_live_quote":
             symbol = arguments.get("symbol", "").upper()
             quote = await market_provider.get_quote(symbol)
+            if not quote:
+                return {"status": "INSUFFICIENT_DATA", "message": f"Quote unavailable for {symbol}"}
+
+            def _get(field, default=0):
+                return getattr(quote, field, None) if hasattr(quote, field) else (quote.get(field, default) if isinstance(quote, dict) else default)
+
             return {
-                "symbol": quote["symbol"],
-                "price": float(quote["price"]),
-                "change": float(quote["change"]),
-                "change_pct": float(quote["change_pct"]),
-                "high": float(quote["high"]),
-                "low": float(quote["low"]),
-                "volume": quote["volume"],
-                "timestamp": str(quote["timestamp"])
+                "symbol": _get("symbol", symbol),
+                "price": float(_get("price", 0.0) or 0.0),
+                "change": float(_get("change", 0.0) or 0.0),
+                "change_pct": float(_get("change_pct", 0.0) or 0.0),
+                "high": float(_get("high", 0.0) or 0.0),
+                "low": float(_get("low", 0.0) or 0.0),
+                "volume": int(_get("volume", 0) or 0),
+                "timestamp": str(_get("timestamp", ""))
             }
 
         elif tool_name == "get_indicators":
             symbol = arguments.get("symbol", "").upper()
+            from app.services.indicator_service import IndicatorService
             indicators = await IndicatorService.compute_indicators(symbol)
             return indicators
 
@@ -120,16 +142,38 @@ class AIToolExecutor:
 
         elif tool_name == "get_company_fundamentals":
             symbol = arguments.get("symbol", "").upper()
-            fundamentals = COMPANY_FUNDAMENTALS.get(symbol, {
-                "pe_ratio": 24.5,
-                "pb_ratio": 3.5,
-                "market_cap_cr": 150000,
-                "roe_pct": 15.0,
-                "debt_to_equity": 0.5,
-                "dividend_yield_pct": 1.0,
-                "sector": "Broad Market"
-            })
-            return {"symbol": symbol, "fundamentals": fundamentals}
+            try:
+                fund = await FundamentalsService.get_fundamentals(symbol)
+                return {
+                    "symbol": symbol,
+                    "company_name": fund.get("company_name"),
+                    "market_cap": fund.get("market_cap"),
+                    "pe_ratio": fund.get("pe_ratio"),
+                    "eps": fund.get("eps"),
+                    "book_value": fund.get("book_value"),
+                    "debt_to_equity": fund.get("debt_to_equity"),
+                    "roe": fund.get("roe"),
+                    "dividend_yield": fund.get("dividend_yield"),
+                    "fundamentals": fund
+                }
+            except Exception:
+                return {"symbol": symbol, "status": "INSUFFICIENT_DATA"}
+
+        elif tool_name == "get_option_chain":
+            symbol = arguments.get("symbol", "").upper()
+            try:
+                chain = await OptionsService.get_option_chain(symbol)
+                return {
+                    "symbol": symbol,
+                    "underlying_price": chain.get("underlying_price"),
+                    "pcr_ratio": chain.get("pcr_ratio"),
+                    "max_pain": chain.get("max_pain"),
+                    "total_call_oi": chain.get("total_call_oi"),
+                    "total_put_oi": chain.get("total_put_oi"),
+                    "selected_expiry": chain.get("selected_expiry")
+                }
+            except Exception:
+                return {"symbol": symbol, "status": "INSUFFICIENT_DATA"}
 
         elif tool_name == "get_latest_news":
             symbol = arguments.get("symbol")

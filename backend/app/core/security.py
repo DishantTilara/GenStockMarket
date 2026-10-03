@@ -1,7 +1,7 @@
 import bcrypt
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Union
-from jose import jwt, JWTError
+from jose import jwt, JWTError  # type: ignore
 from app.core.config import settings
 from app.core.errors import UnauthorizedError
 
@@ -57,3 +57,30 @@ def decode_token(token: str) -> Dict[str, Any]:
         return payload
     except JWTError:
         raise UnauthorizedError(message="Invalid or expired authentication token")
+
+
+def _get_encryption_cipher() -> Any:
+    import base64
+    import hashlib
+    from cryptography.fernet import Fernet
+    # Derive 32-byte urlsafe base64 key from SECRET_KEY
+    key_bytes = hashlib.sha256(settings.SECRET_KEY.encode()).digest()
+    fernet_key = base64.urlsafe_b64encode(key_bytes)
+    return Fernet(fernet_key)
+
+
+def encrypt_broker_secret(raw_secret: str) -> str:
+    """Encrypt broker API secret or token for secure persistence at rest."""
+    if not raw_secret:
+        return ""
+    cipher = _get_encryption_cipher()
+    return cipher.encrypt(raw_secret.encode("utf-8")).decode("utf-8")
+
+
+def decrypt_broker_secret(encrypted_secret: str) -> str:
+    """Decrypt broker API secret or token into memory."""
+    if not encrypted_secret:
+        return ""
+    cipher = _get_encryption_cipher()
+    return cipher.decrypt(encrypted_secret.encode("utf-8")).decode("utf-8")
+

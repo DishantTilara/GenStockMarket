@@ -1,5 +1,5 @@
 import logging
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Any
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
@@ -13,7 +13,7 @@ class Base(DeclarativeBase):
 
 
 # Create async engine with appropriate pool arguments
-engine_kwargs = {"echo": False, "future": True}
+engine_kwargs: dict[str, Any] = {"echo": False, "future": True}
 
 if settings.DATABASE_URL.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}

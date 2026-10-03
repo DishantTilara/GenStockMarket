@@ -8,7 +8,15 @@ class BrokerProvider(ABC):
         pass
 
     @abstractmethod
+    async def disconnect(self) -> bool:
+        pass
+
+    @abstractmethod
     async def get_account(self) -> Dict[str, Any]:
+        pass
+
+    @abstractmethod
+    async def get_balance(self) -> Dict[str, Any]:
         pass
 
     @abstractmethod
@@ -17,6 +25,14 @@ class BrokerProvider(ABC):
 
     @abstractmethod
     async def get_orders(self) -> List[Dict[str, Any]]:
+        pass
+
+    @abstractmethod
+    async def get_trades(self) -> List[Dict[str, Any]]:
+        pass
+
+    @abstractmethod
+    async def get_margins(self) -> Dict[str, Any]:
         pass
 
     @abstractmethod

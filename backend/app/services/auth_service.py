@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,14 +33,29 @@ class AuthService:
         db.add(new_user)
         await db.flush()
 
-        # Initialize default user wallet with starting demo trading balance
+        # Initialize default user wallet with starting paper trading balance (₹10,00,000)
         wallet = Wallet(
             user_id=new_user.id,
-            available_balance=100000.00,  # 1 Lakh INR starting demo balance
-            locked_balance=0.00,
+            available_balance=Decimal("1000000.00"),
+            locked_balance=Decimal("0.00"),
             currency="INR"
         )
         db.add(wallet)
+        await db.flush()
+
+        # Record initial paper capital deposit in ledger
+        from app.models.wallet import LedgerEntry
+        db.add(LedgerEntry(
+            wallet_id=wallet.id,
+            reference=f"INIT-PAPER-{new_user.id.hex[:8].upper()}",
+            entry_type="DEPOSIT",
+            direction="CREDIT",
+            amount=Decimal("1000000.00"),
+            balance_after=Decimal("1000000.00"),
+            status="POSTED",
+            description="Initial simulated paper trading capital",
+            metadata_json={"type": "INITIAL_PAPER_CAPITAL"}
+        ))
 
         # Initialize default user portfolio
         portfolio = Portfolio(

@@ -36,9 +36,9 @@ class BacktestRequest(BaseModel):
     symbol: str
     timeframe: str = "5m"
     days_back: int = Field(default=30, ge=1, le=365)
-    initial_capital: Decimal = Field(default=Decimal("100000.00"), gt=0)
-    slippage_pct: Decimal = Field(default=Decimal("0.05"), ge=0)
-    brokerage_per_trade: Decimal = Field(default=Decimal("20.00"), ge=0)
+    initial_capital: Decimal = Field(default=Decimal("100000.00"), gt=Decimal("0"))
+    slippage_pct: Decimal = Field(default=Decimal("0.05"), ge=Decimal("0"))
+    brokerage_per_trade: Decimal = Field(default=Decimal("20.00"), ge=Decimal("0"))
     entry_rules: Optional[List[str]] = None
     exit_rules: Optional[List[str]] = None
     stop_loss_pct: Optional[Decimal] = Decimal("1.5")

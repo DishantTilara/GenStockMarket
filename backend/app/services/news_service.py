@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.news import NewsArticle, CorporateAction
 from app.models.rag import Document, DocumentChunk
+from app.providers.news.factory import get_news_provider
 
 INITIAL_NEWS = [
     {
@@ -111,8 +112,49 @@ class NewsService:
         await db.commit()
 
     @staticmethod
+    async def sync_news_from_provider(db: AsyncSession, symbol: Optional[str] = None, limit: int = 10) -> None:
+        try:
+            provider = get_news_provider()
+            articles = await provider.get_news(symbol, limit)
+            for item in articles:
+                text_to_hash = item.get("title", "") + item.get("source", "")
+                chash = hashlib.sha256(text_to_hash.encode("utf-8")).hexdigest()
+
+                existing = await db.execute(select(NewsArticle).where(NewsArticle.content_hash == chash))
+                if existing.scalar_one_or_none():
+                    continue
+
+                pub_at = item.get("published_at")
+                if isinstance(pub_at, str):
+                    try:
+                        pub_dt = datetime.fromisoformat(pub_at.replace("Z", "+00:00"))
+                    except Exception:
+                        pub_dt = datetime.now(timezone.utc)
+                elif isinstance(pub_at, datetime):
+                    pub_dt = pub_at
+                else:
+                    pub_dt = datetime.now(timezone.utc)
+
+                article = NewsArticle(
+                    title=item["title"],
+                    source=item.get("source", "Market News"),
+                    url=item.get("url"),
+                    symbol=item.get("symbol"),
+                    content=item.get("content", item["title"]),
+                    content_hash=chash,
+                    sentiment=item.get("sentiment", "NEUTRAL"),
+                    sentiment_score=Decimal(str(item.get("sentiment_score", 0.0))),
+                    published_at=pub_dt
+                )
+                db.add(article)
+            await db.commit()
+        except Exception as exc:
+            await db.rollback()
+
+    @staticmethod
     async def get_news(db: AsyncSession, symbol: Optional[str] = None, limit: int = 20) -> List[NewsArticle]:
         await NewsService.seed_initial_news(db)
+        await NewsService.sync_news_from_provider(db, symbol, limit=limit)
         query = select(NewsArticle).order_by(NewsArticle.published_at.desc()).limit(limit)
         if symbol:
             query = query.where(NewsArticle.symbol == symbol.upper())

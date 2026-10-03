@@ -2,13 +2,15 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class PortfolioPositionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     symbol: str
-    sector: Optional[str]
+    sector: Optional[str] = None
     quantity: int
     average_price: Decimal
     current_price: Decimal
@@ -16,19 +18,26 @@ class PortfolioPositionResponse(BaseModel):
     current_value: Decimal
     unrealized_pnl: Decimal
     unrealized_pnl_pct: Decimal
-
-    class Config:
-        from_attributes = True
+    realized_pnl: Decimal = Decimal("0.00")
+    stop_loss: Optional[Decimal] = None
+    target_price: Optional[Decimal] = None
 
 
 class PortfolioResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     name: str
     total_invested: Decimal
     current_value: Decimal
     total_unrealized_pnl: Decimal
     total_unrealized_pnl_pct: Decimal
+    realized_pnl: Decimal = Decimal("0.00")
+    total_pnl: Decimal = Decimal("0.00")
+    today_pnl: Decimal = Decimal("0.00")
+    today_pnl_pct: Decimal = Decimal("0.00")
     cash_balance: Decimal
+    total_equity: Decimal
     positions: List[PortfolioPositionResponse] = []
     sector_allocation: Dict[str, Decimal] = {}
 

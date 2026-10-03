@@ -18,8 +18,8 @@ export const MarketTicker: React.FC = () => {
 
   return (
     <div style={{
-      background: 'rgba(15, 23, 42, 0.9)',
-      borderBottom: '1px solid var(--border-subtle)',
+      background: 'var(--ticker-bg)',
+      borderBottom: '1px solid var(--border)',
       padding: '6px 16px',
       overflowX: 'auto',
       whiteSpace: 'nowrap',
@@ -27,7 +27,8 @@ export const MarketTicker: React.FC = () => {
       gap: '24px',
       alignItems: 'center',
       fontSize: '0.8rem',
-      fontWeight: 600
+      fontWeight: 600,
+      transition: 'background 0.25s ease, border-color 0.25s ease'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)' }}>
         <span className="pulsing-dot green"></span>

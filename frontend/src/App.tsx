@@ -3,9 +3,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { MarketTicker } from './components/MarketTicker';
+import { MobileNav } from './components/MobileNav';
 
 // Pages
 import { Dashboard } from './pages/Dashboard';
@@ -19,8 +21,13 @@ import { AINewspaper } from './pages/AINewspaper';
 import { Strategies } from './pages/Strategies';
 import { Backtests } from './pages/Backtests';
 import { Portfolio } from './pages/Portfolio';
+import { Orders } from './pages/Orders';
+import { Positions } from './pages/Positions';
 import { Wallet } from './pages/Wallet';
 import { Settings } from './pages/Settings';
+import { Risk } from './pages/Risk';
+import { Broker } from './pages/Broker';
+import { AIAutoTrading } from './pages/AIAutoTrading';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 
@@ -34,6 +41,7 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
         <main className="content-body">
           {children}
         </main>
+        <MobileNav />
       </div>
     </div>
   );
@@ -42,35 +50,42 @@ const ProtectedLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
-      <ToastProvider>
-        <AuthProvider>
-          <WebSocketProvider>
-            <Routes>
-              {/* Public Auth Routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <WebSocketProvider>
+              <Routes>
+                {/* Public Auth Routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
 
-              {/* Protected Platform Routes */}
-              <Route path="/dashboard" element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
-              <Route path="/market" element={<ProtectedLayout><Market /></ProtectedLayout>} />
-              <Route path="/stock/:symbol" element={<ProtectedLayout><StockDetail /></ProtectedLayout>} />
-              <Route path="/watchlists" element={<ProtectedLayout><Watchlists /></ProtectedLayout>} />
-              <Route path="/scanner" element={<ProtectedLayout><Scanner /></ProtectedLayout>} />
-              <Route path="/alerts" element={<ProtectedLayout><Alerts /></ProtectedLayout>} />
-              <Route path="/ai" element={<ProtectedLayout><AIAssistant /></ProtectedLayout>} />
-              <Route path="/ai/newspaper" element={<ProtectedLayout><AINewspaper /></ProtectedLayout>} />
-              <Route path="/strategies" element={<ProtectedLayout><Strategies /></ProtectedLayout>} />
-              <Route path="/backtests" element={<ProtectedLayout><Backtests /></ProtectedLayout>} />
-              <Route path="/portfolio" element={<ProtectedLayout><Portfolio /></ProtectedLayout>} />
-              <Route path="/wallet" element={<ProtectedLayout><Wallet /></ProtectedLayout>} />
-              <Route path="/settings" element={<ProtectedLayout><Settings /></ProtectedLayout>} />
+                {/* Protected Platform Routes */}
+                <Route path="/dashboard" element={<ProtectedLayout><Dashboard /></ProtectedLayout>} />
+                <Route path="/market" element={<ProtectedLayout><Market /></ProtectedLayout>} />
+                <Route path="/stock/:symbol" element={<ProtectedLayout><StockDetail /></ProtectedLayout>} />
+                <Route path="/watchlists" element={<ProtectedLayout><Watchlists /></ProtectedLayout>} />
+                <Route path="/scanner" element={<ProtectedLayout><Scanner /></ProtectedLayout>} />
+                <Route path="/alerts" element={<ProtectedLayout><Alerts /></ProtectedLayout>} />
+                <Route path="/ai" element={<ProtectedLayout><AIAssistant /></ProtectedLayout>} />
+                <Route path="/ai/auto-trading" element={<ProtectedLayout><AIAutoTrading /></ProtectedLayout>} />
+                <Route path="/ai/newspaper" element={<ProtectedLayout><AINewspaper /></ProtectedLayout>} />
+                <Route path="/strategies" element={<ProtectedLayout><Strategies /></ProtectedLayout>} />
+                <Route path="/backtests" element={<ProtectedLayout><Backtests /></ProtectedLayout>} />
+                <Route path="/orders" element={<ProtectedLayout><Orders /></ProtectedLayout>} />
+                <Route path="/positions" element={<ProtectedLayout><Positions /></ProtectedLayout>} />
+                <Route path="/portfolio" element={<ProtectedLayout><Portfolio /></ProtectedLayout>} />
+                <Route path="/wallet" element={<ProtectedLayout><Wallet /></ProtectedLayout>} />
+                <Route path="/risk" element={<ProtectedLayout><Risk /></ProtectedLayout>} />
+                <Route path="/broker" element={<ProtectedLayout><Broker /></ProtectedLayout>} />
+                <Route path="/settings" element={<ProtectedLayout><Settings /></ProtectedLayout>} />
 
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </WebSocketProvider>
-        </AuthProvider>
-      </ToastProvider>
+                {/* Fallback */}
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </WebSocketProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 };

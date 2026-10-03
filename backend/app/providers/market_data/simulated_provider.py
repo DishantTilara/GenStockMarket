@@ -7,7 +7,7 @@ from typing import AsyncGenerator, Dict, List, Any, Optional
 from app.providers.market_data.base import MarketDataProvider
 
 # Default Indian Equities and Indices reference prices
-INDIAN_INSTRUMENTS = [
+INDIAN_INSTRUMENTS: List[Dict[str, Any]] = [
     {"symbol": "NIFTY 50", "name": "Nifty 50 Index", "exchange": "NSE", "segment": "INDEX", "base_price": 25850.00, "sector": "Benchmark", "lot_size": 25, "tick_size": 0.05},
     {"symbol": "BANKNIFTY", "name": "Nifty Bank Index", "exchange": "NSE", "segment": "INDEX", "base_price": 53400.00, "sector": "Banking", "lot_size": 15, "tick_size": 0.05},
     {"symbol": "RELIANCE", "name": "Reliance Industries Ltd", "exchange": "NSE", "segment": "EQUITY", "base_price": 2985.50, "sector": "Energy", "lot_size": 1, "tick_size": 0.05},
@@ -40,8 +40,8 @@ class SimulatedMarketDataProvider(MarketDataProvider):
         self._running = False
 
         for inst in INDIAN_INSTRUMENTS:
-            sym = inst["symbol"]
-            base = inst["base_price"]
+            sym = str(inst["symbol"])
+            base = float(inst["base_price"])
             self._prev_closes[sym] = round(base * (1.0 + random.uniform(-0.015, 0.015)), 2)
             open_price = round(self._prev_closes[sym] * (1.0 + random.uniform(-0.008, 0.008)), 2)
             self._day_opens[sym] = open_price
@@ -57,7 +57,7 @@ class SimulatedMarketDataProvider(MarketDataProvider):
     async def stream(self) -> AsyncGenerator[Dict[str, Any], None]:
         while self._running:
             # Pick a subset of instruments to simulate tick arrivals
-            active_symbols = random.sample([inst["symbol"] for inst in INDIAN_INSTRUMENTS], k=random.randint(3, 7))
+            active_symbols = random.sample([str(inst["symbol"]) for inst in INDIAN_INSTRUMENTS], k=random.randint(3, 7))
             now = datetime.now(timezone.utc)
 
             for sym in active_symbols:
@@ -219,6 +219,15 @@ class SimulatedMarketDataProvider(MarketDataProvider):
             "trading_day": now_ist.strftime("%Y-%m-%d"),
             "market_time": now_ist,
             "message": msg
+        }
+
+    async def health(self) -> Dict[str, Any]:
+        return {
+            "provider": "simulated",
+            "is_connected": self._connected,
+            "status": "HEALTHY" if self._connected else "DISCONNECTED",
+            "symbols_tracked": len(INDIAN_INSTRUMENTS),
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
 
     async def close(self) -> None:

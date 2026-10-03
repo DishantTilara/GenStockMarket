@@ -1,186 +1,391 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ApiClient } from '../api/client';
 import { useToast } from '../context/ToastContext';
-import { ShieldCheck, AlertTriangle, CheckCircle2, X, Lock } from 'lucide-react';
+import { useWebSocket } from '../context/WebSocketContext';
+import { ShieldCheck, AlertTriangle, CheckCircle2, X, Lock, ArrowUpRight, ArrowDownRight, Calculator } from 'lucide-react';
 
 interface TradeExecutionModalProps {
-  setup: any;
+  setup?: any;
+  symbol?: string;
+  defaultSide?: 'BUY' | 'SELL';
+  isOpen?: boolean;
   onClose: () => void;
-  onSuccess: (order: any) => void;
+  onSuccess?: (order: any) => void;
 }
 
-export const TradeExecutionModal: React.FC<TradeExecutionModalProps> = ({ setup, onClose, onSuccess }) => {
-  const [step, setStep] = useState<'VALIDATING' | 'READY_FOR_APPROVAL' | 'REJECTED' | 'EXECUTING'>('VALIDATING');
-  const [riskData, setRiskData] = useState<any>(null);
-  const { showToast } = useToast();
+export const TradeExecutionModal: React.FC<TradeExecutionModalProps> = ({
+  setup,
+  symbol: initialSymbol,
+  defaultSide = 'BUY',
+  isOpen = true,
+  onClose,
+  onSuccess
+}) => {
+  const activeSymbol = (setup?.symbol || initialSymbol || 'RELIANCE').toUpperCase();
+  const [side, setSide] = useState<'BUY' | 'SELL'>(setup?.side || defaultSide);
+  const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET');
+  const [quantity, setQuantity] = useState<number>(setup?.quantity || 10);
+  const [limitPrice, setLimitPrice] = useState<number>(0);
+  const [stopLoss, setStopLoss] = useState<number | undefined>(setup?.stop_loss);
+  const [target, setTarget] = useState<number | undefined>(setup?.target_price);
 
-  React.useEffect(() => {
-    // Run pre-flight risk checks immediately upon opening
-    const checkRisk = async () => {
+  const [currentPrice, setCurrentPrice] = useState<number>(0);
+  const [availableFunds, setAvailableFunds] = useState<number>(0);
+  const [ownedQuantity, setOwnedQuantity] = useState<number>(0);
+  const [loading, setLoading] = useState(false);
+  const [riskData, setRiskData] = useState<any>(null);
+  const [riskValidating, setRiskValidating] = useState(false);
+  const [reviewMode, setReviewMode] = useState(false);
+
+  const { showToast } = useToast();
+  const { marketTicks } = useWebSocket();
+
+  // Load quote, wallet, and holding on mount
+  useEffect(() => {
+    const loadMarketAndAccount = async () => {
       try {
-        const payload = {
-          symbol: setup.symbol,
-          side: setup.side,
-          order_type: 'LIMIT',
-          quantity: setup.quantity,
-          price: setup.entry_zone ? (setup.entry_zone.min + setup.entry_zone.max) / 2 : setup.stop_loss * 1.02,
-          stop_loss: setup.stop_loss,
-          target: setup.target_price
-        };
-        const res = await ApiClient.validateRisk(payload);
-        setRiskData(res);
-        if (res.approved) {
-          setStep('READY_FOR_APPROVAL');
-        } else {
-          setStep('REJECTED');
-        }
+        const [quote, wallet, positionsData] = await Promise.all([
+          ApiClient.getQuote(activeSymbol),
+          ApiClient.getWallet(),
+          ApiClient.getPositions()
+        ]);
+        const price = Number(quote.price);
+        setCurrentPrice(price);
+        if (!limitPrice) setLimitPrice(price);
+        setAvailableFunds(Number(wallet.available_balance));
+
+        const holding = positionsData.open_positions?.find(p => p.symbol === activeSymbol);
+        setOwnedQuantity(holding ? holding.quantity : 0);
       } catch (err: any) {
-        showToast(err.message || 'Risk validation failed', 'error');
-        setStep('REJECTED');
+        console.error(err);
       }
     };
+    loadMarketAndAccount();
+  }, [activeSymbol]);
 
-    checkRisk();
-  }, [setup]);
+  // Live price update from WebSocket
+  useEffect(() => {
+    if (marketTicks[activeSymbol]) {
+      const livePrice = marketTicks[activeSymbol].price;
+      setCurrentPrice(livePrice);
+    }
+  }, [marketTicks, activeSymbol]);
 
-  const handleConfirmOrder = async () => {
-    if (!riskData?.confirmation_token) return;
-    setStep('EXECUTING');
+  const effectivePrice = orderType === 'MARKET' ? currentPrice : (limitPrice || currentPrice);
+  const turnover = effectivePrice * quantity;
+  
+  // Approximate Indian charges (Brokerage min 20, STT 0.1%, GST 18%, etc ~ 0.12%)
+  const estimatedCharges = Math.max(20, turnover * 0.0012);
+  const totalRequired = turnover + estimatedCharges;
+
+  // Validate Risk
+  const handleValidateRisk = async () => {
     try {
-      const execPayload = {
-        confirmation_token: riskData.confirmation_token,
-        symbol: setup.symbol,
-        side: setup.side,
-        order_type: 'LIMIT',
-        quantity: setup.quantity,
-        price: setup.entry_zone ? (setup.entry_zone.min + setup.entry_zone.max) / 2 : setup.stop_loss * 1.02,
-        stop_loss: setup.stop_loss,
-        target: setup.target_price
-      };
-      const order = await ApiClient.executeOrder(execPayload);
-      showToast(`Order executed: ${order.side} ${order.quantity} ${order.symbol} (${order.broker_order_id})`, 'success');
-      onSuccess(order);
+      setRiskValidating(true);
+      const res = await ApiClient.validateRisk({
+        symbol: activeSymbol,
+        side,
+        order_type: orderType,
+        quantity,
+        price: effectivePrice,
+        stop_loss: stopLoss,
+        target
+      });
+      setRiskData(res);
+      if (res.approved) {
+        setReviewMode(true);
+      } else {
+        showToast(res.rejection_reason || 'Risk check rejected', 'error');
+      }
     } catch (err: any) {
-      showToast(err.message || 'Order execution failed', 'error');
-      setStep('READY_FOR_APPROVAL');
+      showToast(err.message || 'Risk check failed', 'error');
+    } finally {
+      setRiskValidating(false);
     }
   };
 
-  const isBuy = setup.side === 'BUY';
+  const handleExecuteOrder = async () => {
+    try {
+      setLoading(true);
+      const order = await ApiClient.createOrder({
+        symbol: activeSymbol,
+        side,
+        order_type: orderType,
+        quantity,
+        price: orderType === 'LIMIT' ? limitPrice : undefined,
+        stop_loss: stopLoss,
+        target_price: target,
+        confirmation_token: riskData?.confirmation_token
+      });
+
+      showToast(`Paper order placed: ${order.side} ${order.quantity} ${order.symbol} (${order.status})`, 'success');
+      if (onSuccess) onSuccess(order);
+      onClose();
+    } catch (err: any) {
+      showToast(err.message || 'Order placement failed', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isBuy = side === 'BUY';
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: '580px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <ShieldCheck size={22} color="var(--accent-green)" />
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Pre-Trade Risk Engine & User Confirmation</h3>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>
+                {isBuy ? 'BUY' : 'SELL'} {activeSymbol}
+              </h3>
+              <span className="paper-badge">PAPER TRADING</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.2rem' }}>
+              <span className="mono" style={{ fontSize: '1rem', fontWeight: 700 }}>
+                ₹{currentPrice.toFixed(2)}
+              </span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                Holding: <b style={{ color: 'var(--text-primary)' }}>{ownedQuantity}</b> shares
+              </span>
+            </div>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+          <button 
+            onClick={onClose} 
+            style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.25rem' }}
+          >
             <X size={20} />
           </button>
         </div>
 
-        {/* Trade Details Summary */}
-        <div style={{ background: 'rgba(30, 41, 59, 0.5)', padding: '14px', borderRadius: '10px', marginBottom: '1.25rem', border: '1px solid var(--border-subtle)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '1.2rem', fontWeight: 700 }}>{setup.symbol}</span>
-              <span className={`badge ${isBuy ? 'badge-green' : 'badge-red'}`} style={{ fontSize: '0.8rem' }}>
-                {setup.side}
-              </span>
-            </div>
-            <div className="mono" style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Qty: <b style={{ color: '#fff' }}>{setup.quantity}</b>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', fontSize: '0.8rem' }} className="mono">
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>Entry Zone:</span>
-              <div style={{ color: '#fff', fontWeight: 600 }}>₹{setup.entry_zone ? `${setup.entry_zone.min} - ${setup.entry_zone.max}` : 'Market'}</div>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>Stop Loss:</span>
-              <div style={{ color: 'var(--accent-red)', fontWeight: 600 }}>₹{Number(setup.stop_loss).toFixed(2)}</div>
-            </div>
-            <div>
-              <span style={{ color: 'var(--text-muted)' }}>Target:</span>
-              <div style={{ color: 'var(--accent-green)', fontWeight: 600 }}>₹{Number(setup.target_price).toFixed(2)}</div>
-            </div>
-          </div>
+        {/* Side Tabs (Buy / Sell) */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '1rem' }}>
+          <button
+            type="button"
+            onClick={() => { setSide('BUY'); setReviewMode(false); }}
+            className={`btn ${isBuy ? 'btn-buy' : 'btn-secondary'}`}
+            style={{ fontWeight: 700 }}
+          >
+            <ArrowUpRight size={16} /> BUY
+          </button>
+          <button
+            type="button"
+            onClick={() => { setSide('SELL'); setReviewMode(false); }}
+            className={`btn ${!isBuy ? 'btn-sell' : 'btn-secondary'}`}
+            style={{ fontWeight: 700 }}
+          >
+            <ArrowDownRight size={16} /> SELL
+          </button>
         </div>
 
-        {/* Risk Check Inspection List */}
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase' }}>
-            Automated Risk Gate Checks
-          </div>
-          {riskData?.checks ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {riskData.checks.map((chk: any, idx: number) => (
-                <div
-                  key={idx}
+        {/* Order Form */}
+        {!reviewMode ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+            {/* Order Type */}
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                Order Type
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setOrderType('MARKET')}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
+                    padding: '0.45rem',
                     borderRadius: '6px',
-                    background: chk.passed ? 'rgba(16, 185, 129, 0.08)' : 'rgba(244, 63, 94, 0.1)',
-                    border: `1px solid ${chk.passed ? 'rgba(16, 185, 129, 0.2)' : 'rgba(244, 63, 94, 0.3)'}`
+                    border: '1px solid var(--border)',
+                    background: orderType === 'MARKET' ? 'var(--primary)' : 'var(--surface-muted)',
+                    color: orderType === 'MARKET' ? '#fff' : 'var(--text-secondary)',
+                    fontWeight: 600,
+                    fontSize: '0.825rem',
+                    cursor: 'pointer'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem' }}>
-                    {chk.passed ? <CheckCircle2 size={16} color="var(--accent-green)" /> : <AlertTriangle size={16} color="var(--accent-red)" />}
-                    <span style={{ color: chk.passed ? '#fff' : 'var(--accent-red)', fontWeight: 500 }}>{chk.check_name}</span>
-                  </div>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>{chk.message}</span>
+                  MARKET (LTP)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOrderType('LIMIT')}
+                  style={{
+                    padding: '0.45rem',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border)',
+                    background: orderType === 'LIMIT' ? 'var(--primary)' : 'var(--surface-muted)',
+                    color: orderType === 'LIMIT' ? '#fff' : 'var(--text-secondary)',
+                    fontWeight: 600,
+                    fontSize: '0.825rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  LIMIT
+                </button>
+              </div>
+            </div>
+
+            {/* Quantity & Price */}
+            <div style={{ display: 'grid', gridTemplateColumns: orderType === 'LIMIT' ? '1fr 1fr' : '1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="input mono tabular-nums"
+                  required
+                />
+              </div>
+
+              {orderType === 'LIMIT' && (
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                    Limit Price (₹)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    value={limitPrice || ''}
+                    onChange={e => setLimitPrice(parseFloat(e.target.value) || 0)}
+                    className="input mono tabular-nums"
+                    required
+                  />
                 </div>
-              ))}
+              )}
             </div>
-          ) : (
-            <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Running pre-trade risk validations...
-            </div>
-          )}
-        </div>
 
-        {/* Explicit Human Confirmation Action */}
-        {step === 'READY_FOR_APPROVAL' && (
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button type="button" onClick={onClose} className="btn btn-secondary" style={{ flex: 1 }}>
-              Reject / Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmOrder}
-              className={`btn ${isBuy ? 'btn-primary' : 'btn-outline-danger'}`}
-              style={{ flex: 1.5, gap: '8px' }}
-            >
-              <Lock size={16} />
-              <span>Confirm & Execute {setup.side}</span>
-            </button>
+            {/* Optional Stop Loss & Target */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                  Stop Loss (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.05"
+                  value={stopLoss || ''}
+                  onChange={e => setStopLoss(e.target.value ? parseFloat(e.target.value) : undefined)}
+                  className="input mono tabular-nums"
+                  placeholder={isBuy ? `< ₹${currentPrice}` : `> ₹${currentPrice}`}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                  Target (₹)
+                </label>
+                <input
+                  type="number"
+                  step="0.05"
+                  value={target || ''}
+                  onChange={e => setTarget(e.target.value ? parseFloat(e.target.value) : undefined)}
+                  className="input mono tabular-nums"
+                  placeholder={isBuy ? `> ₹${currentPrice}` : `< ₹${currentPrice}`}
+                />
+              </div>
+            </div>
+
+            {/* Financial Summary */}
+            <div style={{ background: 'var(--surface-muted)', borderRadius: '8px', padding: '0.85rem', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Estimated Value:</span>
+                <span className="mono tabular-nums" style={{ fontWeight: 600 }}>₹{turnover.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Simulated Charges & Taxes:</span>
+                <span className="mono tabular-nums" style={{ color: 'var(--text-muted)' }}>₹{estimatedCharges.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', borderTop: '1px solid var(--border)', paddingTop: '0.4rem', marginTop: '0.4rem' }}>
+                <span style={{ fontWeight: 600 }}>{isBuy ? 'Required Paper Funds:' : 'Est. Sale Proceeds:'}</span>
+                <span className="mono tabular-nums" style={{ fontWeight: 700, color: isBuy ? 'var(--text-primary)' : 'var(--profit)' }}>
+                  ₹{totalRequired.toFixed(2)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
+                <span>Available Paper Cash:</span>
+                <span className="mono tabular-nums">₹{availableFunds.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+              <button type="button" onClick={onClose} className="btn btn-secondary" style={{ flex: 1 }}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleValidateRisk}
+                disabled={riskValidating}
+                className={`btn ${isBuy ? 'btn-buy' : 'btn-sell'}`}
+                style={{ flex: 2 }}
+              >
+                {riskValidating ? 'Checking Risk...' : 'Review Paper Order'}
+              </button>
+            </div>
           </div>
-        )}
+        ) : (
+          /* Review & Confirm Mode */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ background: 'var(--surface-muted)', borderRadius: '8px', padding: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', color: 'var(--profit)' }}>
+                <CheckCircle2 size={18} />
+                <span style={{ fontWeight: 700, fontSize: '0.875rem' }}>Risk Checks Passed</span>
+              </div>
 
-        {step === 'REJECTED' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ padding: '12px', background: 'rgba(244, 63, 94, 0.15)', borderRadius: '8px', color: 'var(--accent-red)', fontSize: '0.85rem' }}>
-              <b>Order Blocked by Risk Engine:</b> {riskData?.rejection_reason || 'Safety limits breached.'}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.65rem', fontSize: '0.8rem' }}>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Action:</span>
+                  <div style={{ fontWeight: 700 }}>{side} {activeSymbol}</div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Quantity:</span>
+                  <div className="mono tabular-nums" style={{ fontWeight: 700 }}>{quantity} shares</div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Order Type:</span>
+                  <div style={{ fontWeight: 700 }}>{orderType}</div>
+                </div>
+                <div>
+                  <span style={{ color: 'var(--text-muted)' }}>Execution Price:</span>
+                  <div className="mono tabular-nums" style={{ fontWeight: 700 }}>₹{effectivePrice.toFixed(2)}</div>
+                </div>
+                {stopLoss && (
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Stop Loss:</span>
+                    <div className="mono tabular-nums" style={{ color: 'var(--loss)', fontWeight: 600 }}>₹{stopLoss.toFixed(2)}</div>
+                  </div>
+                )}
+                {target && (
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Target:</span>
+                    <div className="mono tabular-nums" style={{ color: 'var(--profit)', fontWeight: 600 }}>₹{target.toFixed(2)}</div>
+                  </div>
+                )}
+              </div>
             </div>
-            <button type="button" onClick={onClose} className="btn btn-secondary">
-              Close
-            </button>
-          </div>
-        )}
 
-        {step === 'EXECUTING' && (
-          <div style={{ textAlign: 'center', padding: '12px', color: 'var(--text-secondary)' }}>
-            Submitting user-approved order to broker gateway...
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" onClick={() => setReviewMode(false)} className="btn btn-secondary" style={{ flex: 1 }}>
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteOrder}
+                disabled={loading}
+                className={`btn ${isBuy ? 'btn-buy' : 'btn-sell'}`}
+                style={{ flex: 2, gap: '0.5rem' }}
+              >
+                <Lock size={15} />
+                <span>{loading ? 'Submitting...' : `Confirm Paper ${side}`}</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
     </div>
   );
 };
+
+export default TradeExecutionModal;

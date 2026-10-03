@@ -81,3 +81,29 @@ class ProviderHealth(Base):
     reconnect_count = Column(Integer, default=0, nullable=False)
     metadata_json = Column(JSON, nullable=True)
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+
+
+class AggregatedCandle(Base):
+    __tablename__ = "aggregated_candles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    instrument_id = Column(UUID(as_uuid=True), ForeignKey("instruments.id", ondelete="CASCADE"), nullable=True, index=True)
+    symbol = Column(String(50), nullable=False, index=True)
+    exchange = Column(String(20), default="NSE", nullable=False)
+    timeframe = Column(String(10), nullable=False, index=True)  # 1m, 5m, 15m, 30m, 1h, 1D
+    interval_start = Column(DateTime(timezone=True), nullable=False, index=True)
+    open = Column(Numeric(20, 4), nullable=False)
+    high = Column(Numeric(20, 4), nullable=False)
+    low = Column(Numeric(20, 4), nullable=False)
+    close = Column(Numeric(20, 4), nullable=False)
+    volume = Column(BigInteger, default=0, nullable=False)
+    source = Column(String(32), default="market_provider", nullable=False)
+    quality = Column(String(16), default="HIGH", nullable=False)
+    is_complete = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("symbol", "timeframe", "interval_start", name="uq_symbol_timeframe_interval"),
+        Index("idx_candles_sym_tf_interval", "symbol", "timeframe", "interval_start"),
+    )
+

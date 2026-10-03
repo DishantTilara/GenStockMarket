@@ -2,6 +2,7 @@ import React from 'react';
 import { TrendingUp, Activity, BarChart2, ShieldAlert } from 'lucide-react';
 
 interface IndicatorPanelProps {
+  symbol?: string;
   indicators: any;
 }
 

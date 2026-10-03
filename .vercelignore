@@ -1,0 +1,7 @@
+backend/
+stockmarket.db
+test.db
+.venv/
+.pytest_cache/
+*.pyc
+__pycache__/

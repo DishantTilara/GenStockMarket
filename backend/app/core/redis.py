@@ -99,7 +99,7 @@ class RedisService:
         try:
             serialized = json.dumps(value, default=str)
             if self._is_redis_available and self.client:
-                return await self.client.set(key, serialized, ex=expire_seconds)
+                return bool(await self.client.set(key, serialized, ex=expire_seconds))
             else:
                 return await self.fallback.set(key, serialized, ex=expire_seconds)
         except Exception as e:
