@@ -5,11 +5,20 @@ import { useMarketStream } from '../context/WebSocketContext';
 import { useToast } from '../context/ToastContext';
 import { ListOrdered, Plus, Trash2, TrendingUp, Zap } from 'lucide-react';
 
+const DEFAULT_WATCHLISTS = [
+  {
+    id: 'default-nifty',
+    name: 'NIFTY 50 Core',
+    description: 'High-volume top Indian bluechip equities',
+    items: ['RELIANCE', 'TCS', 'HDFCBANK', 'INFY', 'ICICIBANK', 'TATAMOTORS', 'SBIN']
+  }
+];
+
 export const Watchlists: React.FC = () => {
   const { ticks } = useMarketStream();
   const { showToast } = useToast();
-  const [watchlists, setWatchlists] = useState<any[]>([]);
-  const [activeWatchlistId, setActiveWatchlistId] = useState<string>('');
+  const [watchlists, setWatchlists] = useState<any[]>(DEFAULT_WATCHLISTS);
+  const [activeWatchlistId, setActiveWatchlistId] = useState<string>('default-nifty');
   const [newSymbol, setNewSymbol] = useState('');
   const [newWatchlistName, setNewWatchlistName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -17,9 +26,11 @@ export const Watchlists: React.FC = () => {
   const fetchWatchlists = async () => {
     try {
       const data = await ApiClient.getWatchlists();
-      setWatchlists(data);
-      if (data.length > 0 && !activeWatchlistId) {
-        setActiveWatchlistId(data[0].id);
+      if (Array.isArray(data) && data.length > 0) {
+        setWatchlists(data);
+        if (!activeWatchlistId) {
+          setActiveWatchlistId(data[0].id);
+        }
       }
     } catch {}
   };

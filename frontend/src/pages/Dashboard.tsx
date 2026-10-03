@@ -111,7 +111,8 @@ export const Dashboard: React.FC = () => {
   const isSelectedUp = selectedChangePct >= 0;
 
   // Authoritative calculations
-  const cashBalance = wallet ? Number(wallet.available_balance) : (portfolio ? Number(portfolio.cash_balance) : 1000000);
+  const rawCash = Number(wallet?.available_balance ?? portfolio?.cash_balance);
+  const cashBalance = isNaN(rawCash) || rawCash <= 0 ? 1000000 : rawCash;
   const positionsValue = positions.reduce((acc, p) => acc + (Number(p.current_value) || 0), 0);
   const totalEquity = cashBalance + positionsValue;
   const totalInvested = positions.reduce((acc, p) => acc + (Number(p.invested_value) || Number(p.invested_amount) || 0), 0);

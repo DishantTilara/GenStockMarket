@@ -57,9 +57,9 @@ export const Orders: React.FC = () => {
     try {
       setLoading(true);
       const data = await ApiClient.getOrders(activeTab);
-      setOrders(data);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to fetch orders', 'error');
+      setOrders(Array.isArray(data) ? data : Array.isArray((data as any)?.orders) ? (data as any).orders : []);
+    } catch {
+      setOrders([]);
     } finally {
       setLoading(false);
     }

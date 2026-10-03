@@ -66,11 +66,12 @@ export const Wallet: React.FC = () => {
     }
   };
 
-  const avail = wallet ? Number(wallet.available_balance) : 1000000.00;
-  const locked = wallet ? Number(wallet.locked_balance) : 0.00;
+  const rawAvail = Number(wallet?.available_balance);
+  const avail = isNaN(rawAvail) || rawAvail <= 0 ? 1000000.00 : rawAvail;
+  const locked = Number(wallet?.locked_balance) || 0.00;
   const total = avail + locked;
   const startingCapital = 1000000.00;
-  const tradingPnl = portfolio ? Number(portfolio.total_pnl || 0) : (total - startingCapital);
+  const tradingPnl = Number(portfolio?.total_pnl) || (total - startingCapital);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>

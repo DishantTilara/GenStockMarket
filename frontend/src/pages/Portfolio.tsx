@@ -59,16 +59,18 @@ export const Portfolio: React.FC = () => {
     }
   };
 
-  const totalValue = portfolio ? Number(portfolio.total_equity) : 1000000;
-  const invested = portfolio ? Number(portfolio.total_invested) : 0;
-  const cash = portfolio ? Number(portfolio.cash_balance) : 1000000;
-  const positionsVal = portfolio ? Number(portfolio.current_value) : 0;
-  const unrealizedPnl = portfolio ? Number(portfolio.total_unrealized_pnl) : 0;
-  const unrealizedPct = portfolio ? Number(portfolio.total_unrealized_pnl_pct) : 0;
-  const realizedPnl = portfolio ? Number(portfolio.realized_pnl || 0) : 0;
-  const overallPnl = portfolio ? Number(portfolio.total_pnl || 0) : (unrealizedPnl + realizedPnl);
-  const todayPnl = portfolio ? Number(portfolio.today_pnl || 0) : unrealizedPnl * 0.35;
-  const todayPct = portfolio ? Number(portfolio.today_pnl_pct || 0) : 0;
+  const rawTotal = Number(portfolio?.total_equity);
+  const totalValue = isNaN(rawTotal) || rawTotal <= 0 ? 1000000 : rawTotal;
+  const invested = Number(portfolio?.total_invested) || 0;
+  const rawCash = Number(portfolio?.cash_balance);
+  const cash = isNaN(rawCash) || rawCash <= 0 ? 1000000 : rawCash;
+  const positionsVal = Number(portfolio?.current_value) || 0;
+  const unrealizedPnl = Number(portfolio?.total_unrealized_pnl) || 0;
+  const unrealizedPct = Number(portfolio?.total_unrealized_pnl_pct) || 0;
+  const realizedPnl = Number(portfolio?.realized_pnl) || 0;
+  const overallPnl = Number(portfolio?.total_pnl) || (unrealizedPnl + realizedPnl);
+  const todayPnl = Number(portfolio?.today_pnl) || (unrealizedPnl * 0.35);
+  const todayPct = Number(portfolio?.today_pnl_pct) || 0;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>

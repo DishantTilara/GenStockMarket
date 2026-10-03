@@ -4,24 +4,47 @@ import { ApiClient } from '../api/client';
 import { useToast } from '../context/ToastContext';
 import { Scan, Sparkles, Play, CheckCircle2, Zap } from 'lucide-react';
 
+const DEFAULT_PRESETS = [
+  {
+    id: 'rsi_oversold',
+    name: 'RSI Oversold Reversal',
+    description: 'Finds bluechip stocks trading with RSI < 35 for mean-reversion bounces',
+    rules: [{ indicator: 'RSI', condition: 'LESS_THAN', value: 35 }]
+  },
+  {
+    id: 'ema_bullish_cross',
+    name: '20 EMA / 50 EMA Golden Cross',
+    description: 'Momentum breakout where 20 EMA is above 50 EMA',
+    rules: [{ indicator: 'EMA_CROSS', condition: 'BULLISH', value: 0 }]
+  },
+  {
+    id: 'volume_breakout',
+    name: 'High Volume Expansion',
+    description: 'Intraday volume exceeding 1.5x of 20-period average volume',
+    rules: [{ indicator: 'VOLUME_RATIO', condition: 'GREATER_THAN', value: 1.5 }]
+  }
+];
+
 export const Scanner: React.FC = () => {
   const { showToast } = useToast();
-  const [presets, setPresets] = useState<any[]>([]);
-  const [selectedPresetId, setSelectedPresetId] = useState<string>('');
+  const [presets, setPresets] = useState<any[]>(DEFAULT_PRESETS);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('rsi_oversold');
   const [nlQuery, setNlQuery] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [results, setResults] = useState<any[]>([]);
-  const [activeRules, setActiveRules] = useState<any[]>([]);
+  const [activeRules, setActiveRules] = useState<any[]>(DEFAULT_PRESETS[0].rules);
 
   useEffect(() => {
-    ApiClient.getScannerPresets().then((p) => {
-      setPresets(p);
-      if (p.length > 0) {
-        setSelectedPresetId(p[0].id);
-        setActiveRules(p[0].rules);
-      }
-    });
+    ApiClient.getScannerPresets()
+      .then((p) => {
+        if (Array.isArray(p) && p.length > 0) {
+          setPresets(p);
+          setSelectedPresetId(p[0].id);
+          setActiveRules(p[0].rules || []);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const handleSelectPreset = (p: any) => {

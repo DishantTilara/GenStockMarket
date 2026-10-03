@@ -5,23 +5,45 @@ import { useMarketStream } from '../context/WebSocketContext';
 import { TradeExecutionModal } from '../components/TradeExecutionModal';
 import { Search, Filter, Sparkles, ArrowUpRight, ArrowDownRight, Zap } from 'lucide-react';
 
+const DEFAULT_NSE_INSTRUMENTS = [
+  { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', sector: 'Energy', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', sector: 'Technology', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', sector: 'Banking', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'INFY', name: 'Infosys Ltd', sector: 'Technology', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', sector: 'Banking', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'TATAMOTORS', name: 'Tata Motors Ltd', sector: 'Automobile', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'SBIN', name: 'State Bank of India', sector: 'Banking', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd', sector: 'Telecom', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'ITC', name: 'ITC Ltd', sector: 'FMCG', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'LT', name: 'Larsen & Toubro Ltd', sector: 'Capital Goods', lot_size: 1, tick_size: 0.05, is_active: true },
+  { symbol: 'NIFTY 50', name: 'Nifty 50 Benchmark Index', sector: 'Indices', lot_size: 25, tick_size: 0.05, is_active: true },
+  { symbol: 'BANKNIFTY', name: 'Nifty Bank Index', sector: 'Indices', lot_size: 15, tick_size: 0.05, is_active: true }
+];
+
 export const Market: React.FC = () => {
   const { ticks } = useMarketStream();
-  const [instruments, setInstruments] = useState<any[]>([]);
+  const [instruments, setInstruments] = useState<any[]>(DEFAULT_NSE_INSTRUMENTS);
   const [search, setSearch] = useState('');
   const [selectedSector, setSelectedSector] = useState('ALL');
   const [activeSetup, setActiveSetup] = useState<any>(null);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
 
   useEffect(() => {
-    ApiClient.getInstruments().then(setInstruments).catch(() => {});
+    ApiClient.getInstruments()
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setInstruments(data);
+        }
+      })
+      .catch(() => {});
   }, []);
 
-  const sectors = ['ALL', ...Array.from(new Set(instruments.map((i) => i.sector || 'General')))];
+  const safeList = Array.isArray(instruments) && instruments.length > 0 ? instruments : DEFAULT_NSE_INSTRUMENTS;
+  const sectors = ['ALL', ...Array.from(new Set(safeList.map((i) => i.sector || 'General')))];
 
-  const filtered = instruments.filter((inst) => {
-    const matchSearch = inst.symbol.toLowerCase().includes(search.toLowerCase()) ||
-                        inst.name.toLowerCase().includes(search.toLowerCase());
+  const filtered = safeList.filter((inst) => {
+    const matchSearch = (inst.symbol || '').toLowerCase().includes(search.toLowerCase()) ||
+                        (inst.name || '').toLowerCase().includes(search.toLowerCase());
     const matchSector = selectedSector === 'ALL' || (inst.sector || 'General') === selectedSector;
     return matchSearch && matchSector;
   });
