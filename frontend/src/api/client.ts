@@ -1,4 +1,5 @@
-const API_BASE = '/api/v1';
+const RAW_API_URL = (import.meta as any).env?.VITE_API_URL || '';
+const API_BASE = (RAW_API_URL ? RAW_API_URL.replace(/\/+$/, '') : '') + '/api/v1';
 
 export class ApiClient {
   private static getAuthHeaders(): HeadersInit {
@@ -19,15 +20,27 @@ export class ApiClient {
       ...(options.headers || {})
     };
 
-    const response = await fetch(url, { ...options, headers });
-    const data = await response.json();
+    let response: Response;
+    try {
+      response = await fetch(url, { ...options, headers });
+    } catch (netErr: any) {
+      throw new Error(`Network error connecting to backend: ${netErr.message || 'Server unreachable'}. Check backend service status.`);
+    }
+
+    let data: any = null;
+    const text = await response.text();
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
 
     if (!response.ok) {
-      const errorMsg = data?.error?.message || data?.detail || 'Request failed';
+      const errorMsg = data?.error?.message || data?.detail || `Backend returned HTTP ${response.status} (${response.statusText || 'Error'}). Ensure backend is running and configured.`;
       throw new Error(errorMsg);
     }
 
-    return data as T;
+    return (data ?? {}) as T;
   }
 
   // Auth

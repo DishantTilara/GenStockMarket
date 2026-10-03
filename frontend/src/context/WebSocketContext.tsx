@@ -51,9 +51,19 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     let delay = 2000;
 
     const connectWs = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/ws/market`;
+      let wsUrl: string;
+      const customWsUrl = (import.meta as any).env?.VITE_WS_URL;
+      const customApiUrl = (import.meta as any).env?.VITE_API_URL;
+      if (customWsUrl) {
+        wsUrl = `${customWsUrl.replace(/\/+$/, '')}/ws/market`;
+      } else if (customApiUrl) {
+        const baseWs = customApiUrl.replace(/^http/, 'ws').replace(/\/+$/, '');
+        wsUrl = `${baseWs}/ws/market`;
+      } else {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        wsUrl = `${protocol}//${host}/ws/market`;
+      }
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
