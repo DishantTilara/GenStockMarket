@@ -30,14 +30,14 @@ class Settings(BaseSettings):
     ]
 
     # Database
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/stockmarket"
-    SYNC_DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/stockmarket"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./stockmarket.db"
+    SYNC_DATABASE_URL: str = "sqlite:///./stockmarket.db"
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 10
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
-    REDIS_ENABLED: bool = True
+    REDIS_ENABLED: bool = False
 
     # Market Data
     MARKET_DATA_PROVIDER: str = "yfinance"
