@@ -144,12 +144,16 @@ async def run_market_ingestion():
                 inst_res = await db.execute(select(Instrument).where(Instrument.is_active == True))
                 instrument_map = {inst.symbol: inst for inst in inst_res.scalars().all()}
 
-                # Reconcile any missing candles on startup/recovery
-                for inst in instrument_map.values():
-                    try:
-                        await MarketService.reconcile_missing_candles(db, inst)
-                    except Exception as ex:
-                        logger.debug(f"Reconciliation note for {inst.symbol}: {ex}")
+                # Reconcile missing candles in background so stream starts immediately without delay
+                async def _bg_reconcile(instruments):
+                    for inst_obj in instruments:
+                        try:
+                            async with AsyncSessionLocal() as recon_db:
+                                await MarketService.reconcile_missing_candles(recon_db, inst_obj)
+                        except Exception as ex:
+                            logger.debug(f"Reconciliation note for {inst_obj.symbol}: {ex}")
+
+                asyncio.create_task(_bg_reconcile(list(instrument_map.values())))
 
             logger.info(f"Loaded {len(instrument_map)} active instruments. Ingesting stream...")
 
